@@ -98,3 +98,6 @@ iOSInjectionProject/
 *.tmp
 *.temp
 
+# Editor history
+.history/
+
