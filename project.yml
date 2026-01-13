@@ -1,0 +1,45 @@
+name: Guitar Tuner
+options:
+  bundleIdPrefix: com.guitartuner
+  deploymentTarget:
+    macOS: "13.0"
+    iOS: "16.0"
+targets:
+  Guitar Tuner macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: .
+        excludes:
+          - "*.md"
+          - "*.plist"
+          - "*.yml"
+          - "*.sh"
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.guitartuner.macos
+      INFOPLIST_FILE: Info.plist
+      SWIFT_VERSION: "5.0"
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    info:
+      path: Info.plist
+      
+  Guitar Tuner iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        excludes:
+          - "*.md"
+          - "*.plist"
+          - "*.yml"
+          - "*.sh"
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.guitartuner.ios
+      INFOPLIST_FILE: Info.plist
+      SWIFT_VERSION: "5.0"
+      IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    info:
+      path: Info.plist
+      properties:
+        NSMicrophoneUsageDescription: "Guitar Tuner needs access to your microphone to detect pitch and tune your guitar."
+
