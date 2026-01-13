@@ -19,14 +19,18 @@ class TunerViewModel: ObservableObject {
     @Published var cursorOpacity: Double = 0.3
     @Published var isLocked: Bool = false
     @Published var noteBadge: String = "A"
+    @Published var isAutoMode: Bool = true
+    @Published var detectedString: TuningString?
     
     // Services
     private let audioService = AudioInputService()
     private let tunerEngine = TunerEngine()
+    private var autoDetector: AutoStringDetector?
     
     private var cancellables = Set<AnyCancellable>()
     
     init() {
+        autoDetector = AutoStringDetector()
         setupBindings()
     }
     
@@ -57,44 +61,54 @@ class TunerViewModel: ObservableObject {
         tunerEngine.$cents
             .assign(to: &$cents)
         
-        tunerEngine.$isStable
-            .map { [weak self] stable in
-                guard let self = self else { return 0.3 }
-                return stable ? 1.0 : 0.3
-            }
-            .assign(to: &$cursorOpacity)
-        
-        // Update status based on tuning state
-        tunerEngine.$cents
-            .combineLatest(tunerEngine.$isStable, tunerEngine.$confidence)
-            .map { [weak self] _, _, _ in
-                guard let self = self else { return (.gray, "Select a string to begin tuning.") }
-                let status = self.tunerEngine.getStatus()
-                let color = Color(hex: status.color.colorValue) ?? .gray
-                return (color, status.message)
-            }
-            .sink { [weak self] color, message in
-                self?.statusColor = color
-                self?.statusMessage = message
+        // Auto-detect string when frequency is detected (more responsive)
+        tunerEngine.$frequencyHz
+            .combineLatest(tunerEngine.$confidence, tunerEngine.$isStable)
+            .sink { [weak self] frequency, confidence, stable in
+                guard let self = self, self.isAutoMode, frequency > 0 else { return }
+                // Don't require stable - detect even during tuning
+                if let detected = self.autoDetector?.detectString(frequency: frequency, confidence: confidence) {
+                    if self.detectedString != detected {
+                        self.detectedString = detected
+                        self.selectString(detected)
+                    }
+                }
             }
             .store(in: &cancellables)
         
-        // Update locked state
-        tunerEngine.$cents
-            .combineLatest(tunerEngine.$isStable, tunerEngine.$confidence)
-            .map { cents, stable, confidence in
-                abs(cents) <= 2.0 && stable && confidence >= 0.3
+        // Bind cursor opacity from engine (handles fade during reset)
+        tunerEngine.$cursorOpacity
+            .assign(to: &$cursorOpacity)
+        
+        // Bind status message and color from engine (already gated for stability)
+        tunerEngine.$statusMessage
+            .assign(to: &$statusMessage)
+        
+        tunerEngine.$statusColor
+            .map { statusColor in
+                Color(hex: statusColor.colorValue) ?? .gray
             }
+            .assign(to: &$statusColor)
+        
+        // Bind locked state from engine (with hysteresis)
+        tunerEngine.$isLocked
             .assign(to: &$isLocked)
     }
     
     func selectString(_ string: TuningString) {
         selectedString = string
-        noteBadge = string.displayName
+        noteBadge = string.displayName  // Use displayName (E, A, D, G, B, E) - letters only
         
         let target = TuningTarget(from: string)
         let sampleRate = audioService.getSampleRate()
         tunerEngine.setTarget(target, sampleRate: sampleRate)
+    }
+    
+    func toggleAutoMode() {
+        isAutoMode.toggle()
+        if !isAutoMode {
+            detectedString = nil
+        }
     }
     
     func startTuning() {

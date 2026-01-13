@@ -7,17 +7,18 @@
 
 import Foundation
 
-enum TuningString: String, CaseIterable, Identifiable {
-    case lowE = "E"
-    case A = "A"
-    case D = "D"
-    case G = "G"
-    case B = "B"
-    case highE = "E"
+enum TuningString: CaseIterable, Identifiable {
+    case lowE
+    case A
+    case D
+    case G
+    case B
+    case highE
     
-    var id: String { rawValue }
+    var id: String { displayName }
     
     var displayName: String {
+        // Display only letters for end user (no octaves)
         switch self {
         case .lowE: return "E"
         case .A: return "A"
@@ -40,24 +41,26 @@ enum TuningString: String, CaseIterable, Identifiable {
     }
     
     var minFrequency: Double {
+        // Even wider ranges for more flexible detection
         switch self {
-        case .lowE: return 70.0
-        case .A: return 95.0
-        case .D: return 130.0
-        case .G: return 175.0
-        case .B: return 220.0
-        case .highE: return 300.0
+        case .lowE: return 60.0   // was 65.0
+        case .A: return 85.0       // was 90.0
+        case .D: return 120.0      // was 125.0
+        case .G: return 165.0      // was 170.0
+        case .B: return 210.0      // was 215.0
+        case .highE: return 290.0  // was 295.0
         }
     }
     
     var maxFrequency: Double {
+        // Even wider ranges for more flexible detection
         switch self {
-        case .lowE: return 105.0
-        case .A: return 140.0
-        case .D: return 190.0
-        case .G: return 240.0
-        case .B: return 300.0
-        case .highE: return 380.0
+        case .lowE: return 115.0  // was 110.0
+        case .A: return 150.0      // was 145.0
+        case .D: return 200.0      // was 195.0
+        case .G: return 250.0      // was 245.0
+        case .B: return 310.0      // was 305.0
+        case .highE: return 390.0  // was 385.0
         }
     }
     

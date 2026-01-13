@@ -31,31 +31,45 @@ struct PitchDetectorYIN {
         }
         
         let frameSize = samples.count
-        let samplesDouble = samples.map { Double($0) }
+        var samplesDouble = samples.map { Double($0) }
+        
+        // Pre-processing: DC removal
+        let mean = samplesDouble.reduce(0.0, +) / Double(frameSize)
+        for i in 0..<frameSize {
+            samplesDouble[i] -= mean
+        }
+        
+        // Pre-processing: Apply Hann window
+        for i in 0..<frameSize {
+            let window = 0.5 * (1.0 - cos(2.0 * .pi * Double(i) / Double(frameSize - 1)))
+            samplesDouble[i] *= window
+        }
         
         // Step 1: Compute difference function
-        var differenceFunction = computeDifferenceFunction(samples: samplesDouble, frameSize: frameSize)
+        let differenceFunction = computeDifferenceFunction(samples: samplesDouble, frameSize: frameSize)
         
         // Step 2: Cumulative mean normalized difference function
-        var cmndf = computeCumulativeMeanNormalizedDifference(differenceFunction: differenceFunction)
+        let cmndf = computeCumulativeMeanNormalizedDifference(differenceFunction: differenceFunction)
         
         // Step 3: Absolute threshold
-        var period = findPeriod(cmndf: cmndf)
+        let period = findPeriod(cmndf: cmndf)
         
         // Step 4: Parabolic interpolation for better accuracy
+        var periodDouble = Double(period)
         if period > 0 && period < cmndf.count - 1 {
-            period = parabolicInterpolation(cmndf: cmndf, period: period)
+            periodDouble = parabolicInterpolation(cmndf: cmndf, period: period)
         }
         
         // Step 5: Convert period to frequency
-        guard period >= minPeriod && period <= maxPeriod else {
+        guard periodDouble >= Double(minPeriod) && periodDouble <= Double(maxPeriod) else {
             return (0.0, 0.0)
         }
         
-        let frequency = sampleRate / Double(period)
+        let frequency = sampleRate / periodDouble
         
         // Compute confidence based on cmndf value at period
-        let confidence = max(0.0, min(1.0, 1.0 - cmndf[period]))
+        let periodIndex = Int(periodDouble)
+        let confidence = max(0.0, min(1.0, 1.0 - cmndf[min(periodIndex, cmndf.count - 1)]))
         
         return (frequency, confidence)
     }

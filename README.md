@@ -179,4 +179,3 @@ Status colors defined in `TunerEngine.swift`:
 
 ## License
 
-Created for Cursor Guitar Tuner Project.

@@ -2,7 +2,7 @@
 //  TunerScreen.swift
 //  Guitar Tuner
 //
-//  Main tuner screen with all UI components.
+//  Main tuner screen redesigned to match modern tuner interface.
 //
 
 import SwiftUI
@@ -12,78 +12,99 @@ struct TunerScreen: View {
     @State private var showSettings = false
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Dark background with subtle gradient
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.08, green: 0.08, blue: 0.12),
-                        Color(red: 0.12, green: 0.12, blue: 0.18)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        ZStack {
+            // Dark background
+            Color.black
                 .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // Header
-                    HeaderView()
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
+            
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("Tuner")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(.white)
                     
                     Spacer()
                     
-                    // Status block (center top)
-                    StatusHeaderView(
-                        statusColor: viewModel.statusColor,
-                        noteBadge: viewModel.noteBadge,
-                        message: viewModel.statusMessage,
-                        frequency: viewModel.frequencyHz
-                    )
-                    .padding(.horizontal, 40)
-                    
-                    Spacer()
-                    
-                    // String field (center)
-                    StringFieldView(
-                        cents: viewModel.cents,
-                        cursorColor: viewModel.statusColor,
-                        cursorOpacity: viewModel.cursorOpacity,
-                        isLocked: viewModel.isLocked
-                    )
-                    .frame(height: geometry.size.height * 0.35)
-                    .padding(.horizontal, 40)
-                    
-                    Spacer()
-                    
-                    // String selector row
-                    StringSelectorView(selectedString: viewModel.selectedString) { string in
-                        viewModel.selectString(string)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 20)
-                    
-                    // Settings button
                     Button(action: {
                         showSettings = true
                     }) {
-                        Text("Tuner settings")
-                            .font(.system(size: 14, weight: .medium))
+                        Image(systemName: "line.3.horizontal.circle")
+                            .font(.system(size: 24))
                             .foregroundColor(.white.opacity(0.7))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.1))
-                            )
                     }
-                    .padding(.bottom, 30)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                
+                Spacer()
+                
+                // Main tuner display
+                VStack(spacing: 0) {
+                    // Semi-circular gauge with note
+                    TunerGaugeView(
+                        note: viewModel.noteBadge,
+                        cents: viewModel.cents,
+                        color: viewModel.statusColor,
+                        opacity: viewModel.cursorOpacity
+                    )
+                    .frame(height: 350)
+                    
+                    Spacer()
+                        .frame(height: 20)
+                    
+                    // Frequency and cents display
+                    HStack(spacing: 40) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("HZ")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text(String(format: "%.1f", viewModel.frequencyHz > 0 ? viewModel.frequencyHz : 0.0))
+                                .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.white)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("cents")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text(String(format: "%+.0f", viewModel.cents))
+                                .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                .foregroundColor(viewModel.statusColor)
+                        }
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 15)
+                    
+                    // Status message (always shown) - positioned lower
+                    Text(viewModel.statusMessage)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(viewModel.statusColor)
+                        .padding(.horizontal, 40)
+                        .padding(.bottom, 10)
+                        .transition(.opacity)
+                }
+                
+                Spacer()
+                
+                // String selector buttons
+                StringSelectorView(selectedString: viewModel.selectedString) { string in
+                    viewModel.isAutoMode = false
+                    viewModel.selectString(string)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
             }
         }
         .onAppear {
             viewModel.startTuning()
-            viewModel.selectString(.A) // Default to A string
+            if viewModel.isAutoMode {
+                // Will auto-detect
+            } else {
+                viewModel.selectString(.A)
+            }
         }
         .onDisappear {
             viewModel.stopTuning()
@@ -93,18 +114,3 @@ struct TunerScreen: View {
         }
     }
 }
-
-struct HeaderView: View {
-    var body: some View {
-        HStack {
-            Text("Guitar tuner")
-                .font(.system(size: 24, weight: .light))
-                .foregroundColor(.white.opacity(0.9))
-            
-            Spacer()
-            
-            // Optional settings icon can go here
-        }
-    }
-}
-

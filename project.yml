@@ -43,3 +43,4 @@ targets:
       properties:
         NSMicrophoneUsageDescription: "Guitar Tuner needs access to your microphone to detect pitch and tune your guitar."
 
+

@@ -2,7 +2,7 @@
 //  AudioInputService.swift
 //  Guitar Tuner
 //
-//  Handles microphone input using AVAudioEngine.
+//  Handles microphone input with overlapped analysis for better responsiveness.
 //
 
 import AVFoundation
@@ -12,7 +12,15 @@ class AudioInputService: ObservableObject {
     private var engine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
     private var sampleRate: Double = 44100.0
-    private let bufferSize: AVAudioFrameCount = 2048
+    
+    // Overlap analysis parameters
+    private let analysisWindowSize: Int = 2048
+    private let hopSize: Int = 256  // Smaller hop for smoother updates (256 for best smoothness)
+    private let tapBufferSize: AVAudioFrameCount = 512  // Small tap buffer for responsiveness
+    
+    // Ring buffer for overlapped analysis
+    private var ringBuffer: [Float] = []
+    private var hopAccumulator: Int = 0
     
     var audioBufferSubject = PassthroughSubject<[Float], Never>()
     var rmsLevelSubject = PassthroughSubject<Double, Never>()
@@ -54,8 +62,8 @@ class AudioInputService: ObservableObject {
         try audioSession.setActive(true)
         #endif
         
-        // Install tap to capture audio
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, _ in
+        // Install tap with small buffer for responsiveness
+        inputNode.installTap(onBus: 0, bufferSize: tapBufferSize, format: format) { [weak self] buffer, _ in
             self?.processBuffer(buffer)
         }
         
@@ -70,11 +78,36 @@ class AudioInputService: ObservableObject {
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
         
         // Compute RMS for gating
-        let rms = sqrt(samples.map { $0 * $0 }.reduce(0, +) / Double(frameLength))
+        let rms = sqrt(samples.map { Double($0) * Double($0) }.reduce(0, +) / Double(frameLength))
         rmsLevelSubject.send(rms)
         
-        // Publish samples for pitch detection
-        audioBufferSubject.send(samples)
+        // Add samples to ring buffer
+        ringBuffer.append(contentsOf: samples)
+        
+        // Keep ring buffer size manageable (keep last analysisWindowSize * 2)
+        let maxBufferSize = analysisWindowSize * 2
+        if ringBuffer.count > maxBufferSize {
+            ringBuffer.removeFirst(ringBuffer.count - maxBufferSize)
+        }
+        
+        // Accumulate hop
+        hopAccumulator += frameLength
+        
+        // Process when we have enough samples and hop size reached
+        if ringBuffer.count >= analysisWindowSize && hopAccumulator >= hopSize {
+            // Extract analysis window (last analysisWindowSize samples)
+            let startIndex = ringBuffer.count - analysisWindowSize
+            let analysisSamples = Array(ringBuffer[startIndex..<ringBuffer.count])
+            
+            // Publish for pitch detection
+            audioBufferSubject.send(analysisSamples)
+            
+            // Reset hop accumulator
+            hopAccumulator -= hopSize
+            if hopAccumulator < 0 {
+                hopAccumulator = 0
+            }
+        }
     }
     
     func stop() {
@@ -85,6 +118,8 @@ class AudioInputService: ObservableObject {
         engine = nil
         inputNode = nil
         isRunning = false
+        ringBuffer.removeAll()
+        hopAccumulator = 0
         
         #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false)
@@ -95,4 +130,3 @@ class AudioInputService: ObservableObject {
         return sampleRate
     }
 }
-
